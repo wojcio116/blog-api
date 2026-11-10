@@ -4,7 +4,7 @@ import { INestApplication } from '@nestjs/common';
 
 function createSwaggerConfig() {
   return new DocumentBuilder()
-    .setTitle('Nest.js project boilerplate API')
+    .setTitle('Blog API')
     .setDescription('This is fancy documentation for API.')
     .setVersion(pack.version)
     .addServer('http://localhost', 'Local development')
