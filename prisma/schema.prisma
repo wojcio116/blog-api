@@ -4,4 +4,14 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
+  output   = "./client"
+}
+
+model Article {
+  id          String   @id @default(uuid()) @db.Uuid
+  title       String
+  text        String
+  publishedAt DateTime @default(now()) @map("published_at")
+
+  @@map("articles")
 }
