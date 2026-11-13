@@ -6,13 +6,13 @@ import { ArticlesRepository } from '../../model/articles.repository';
 export class PrismaArticlesRepository implements ArticlesRepository {
   constructor(private readonly prisma: PrismaService) {}
   async findAll(): Promise<Article[]> {
-    const rows = await this.prisma.article.findMany({
+    const rows = await this.prisma['article'].findMany({
       orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
     });
     return rows.map((r) => new Article(r.id, r.title, r.text, r.publishedAt));
   }
   async findById(id: string): Promise<Article | null> {
-    const r = await this.prisma.article.findUnique({ where: { id } });
+    const r = await this.prisma['article'].findUnique({ where: { id } });
     return r ? new Article(r.id, r.title, r.text, r.publishedAt) : null;
   }
 }
