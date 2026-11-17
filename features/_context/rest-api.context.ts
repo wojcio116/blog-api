@@ -7,15 +7,25 @@ import expect from 'expect';
 import { execSync } from 'child_process';
 import { deepCompare } from '../_helper/deep-compare';
 import { PrismaService } from '../../src/core/prisma/prisma.service';
+
 const apiBaseUrl = 'http://localhost:3000';
 let apiToken: string | null = null;
 let apiResponse: AxiosResponse;
 let prevBody: unknown;
+
+function buildAuthHeaders(): Record<string, string> {
+  if (!apiToken) {
+    return {};
+  }
+  return { Authorization: 'Bearer ' + apiToken };
+}
+
 Given('I use seed data', () => {
   execSync(
     'npx prisma migrate reset --force > /dev/null && npm run database:seed > /dev/null',
   );
 });
+
 Given('the database has no articles', async () => {
   const p = new PrismaService();
   await p.$connect();
@@ -26,20 +36,32 @@ Given('the database has no articles', async () => {
   ).deleteMany();
   await p.$disconnect();
 });
+
 Given('I use admin token', async () => {
   apiToken = 'admin-token';
 });
+
 Given('I use destructive actions token', async () => {
   apiToken = 'destructive-actions-token';
 });
+
+Given('I do not use a token', async () => {
+  apiToken = null;
+});
+
+Given('I use a wrong token', async () => {
+  apiToken = 'wrong-token';
+});
+
 When('I send a {string} request to {string}', async (m: string, p: string) => {
   apiResponse = await axios.request({
     method: m,
     url: apiBaseUrl + p,
     validateStatus: () => true,
-    headers: apiToken === '' ? {} : { Authorization: 'Bearer ' + apiToken },
+    headers: buildAuthHeaders(),
   });
 });
+
 When(
   'I send a {string} request to {string} with body:',
   async (m: string, p: string, b: string) => {
@@ -48,29 +70,56 @@ When(
       url: apiBaseUrl + p,
       data: JSON.parse(b),
       validateStatus: () => true,
-      headers: apiToken === '' ? {} : { Authorization: 'Bearer ' + apiToken },
+      headers: buildAuthHeaders(),
     });
   },
 );
+
+When('I send a {string} request to the created article', async (m: string) => {
+  const id = (prevBody as { id: string }).id;
+  apiResponse = await axios.request({
+    method: m,
+    url: `${apiBaseUrl}/api/v1/articles/${id}`,
+    validateStatus: () => true,
+    headers: buildAuthHeaders(),
+  });
+});
+
 When('I remember the response body', () => {
   prevBody = apiResponse.data;
 });
+
 When('I run the database seed again', () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   true;
 });
+
 Then('the response status should be {int}', (s: number) => {
   expect(apiResponse.status).toBe(s);
 });
+
 Then('the response body should have the property {string}', (prop: string) => {
   expect(apiResponse.data).toHaveProperty(prop);
 });
+
 Then('the response body should contain:', async function (doc: string) {
   deepCompare(apiResponse.data, JSON.parse(doc));
 });
+
+Then(
+  'the response body should have a violation on {string}',
+  (field: string) => {
+    expect(apiResponse.data).toHaveProperty('violations');
+    expect(apiResponse.data.violations).toHaveProperty(field);
+    expect(Array.isArray(apiResponse.data.violations[field])).toBe(true);
+    expect(apiResponse.data.violations[field].length).toBeGreaterThan(0);
+  },
+);
+
 Then('the response body should be an empty list', () => {
   expect(apiResponse.data).toEqual([]);
 });
+
 Then(
   'the response body should contain {int} articles ordered newest first',
   (c: number) => {
@@ -83,16 +132,26 @@ Then(
       );
   },
 );
+
 Then('the response body should match the remembered response body', () => {
   expect(apiResponse.data).toEqual(prevBody);
 });
+
 Then('the response body should contain a not found message', () => {
   expect(typeof apiResponse.data.message).toBe('string');
   expect(apiResponse.data.message.toLowerCase()).toContain('does not exist');
 });
+
 Then('I dump response', () => {
   console.log(JSON.stringify(apiResponse.data));
 });
+
 After(() => {
   apiToken = null;
 });
+Then(
+  'the response body property {string} should equal {string}',
+  (prop: string, val: string) => {
+    expect((apiResponse.data as Record<string, unknown>)[prop]).toBe(val);
+  },
+);
